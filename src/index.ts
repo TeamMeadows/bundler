@@ -7,8 +7,8 @@ export type ProjectType = "package" | "addon";
 export type AddonSide = "client" | "shared" | "server";
 
 const cwd = process.cwd();
-const name = core.getInput("name") || 'atomic';
-const type = core.getInput("type") as ProjectType || 'addon';
+const name = core.getInput("name");
+const type = core.getInput("type") as ProjectType;
 export const distDir = path.join(process.cwd(), "dist", name, "lua");
 
 fs.mkdirSync(distDir, { recursive: true });
