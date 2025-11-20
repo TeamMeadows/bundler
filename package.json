@@ -1,0 +1,24 @@
+{
+  "name": "bundler",
+  "author": "smokingplaya",
+  "repository": "https://github.com/TeamMeadows/bundler",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "@types/luaparse": "^0.2.13",
+    "@types/node": "^24.10.1",
+    "iconv-lite": "^0.7.0",
+    "luamin": "^1.0.4",
+    "luaparse": "^0.3.1"
+  }
+}

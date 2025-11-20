@@ -1,0 +1,21 @@
+name: Meadows Bundler
+description: Bundler for Atomic Framework based packages and Garry's Mod Lua addons
+
+inputs:
+  # "package" for packages, "addon" for addon bundling
+  kind:
+    description: Kind of your project
+    required: false
+    default: package
+  # todo: add this feature
+  generate-docs:
+    description: Should bunder make documentation for LuaLS?
+    required: false
+    default: false
+  name:
+    description:
+    required: true
+
+runs:
+  using: node20
+  main: action-dist/index.js
