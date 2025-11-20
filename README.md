@@ -35,7 +35,7 @@ otherIncludeFunction("someotherfile.lua")
 ### GitHub Workflow usage
 ```yaml
 steps:
-  - uses: TeamMeadows/bundler@v1
+  - uses: TeamMeadows/bundler@v0.1.0
     with:
       name: foldername # Required!
 
