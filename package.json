@@ -4,10 +4,11 @@
   "repository": "https://github.com/TeamMeadows/bundler",
   "version": "0.1.0",
   "scripts": {
-    "build": "tsc"
+    "build": "ncc build src/index.ts -o action-dist"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@vercel/ncc": "^0.38.4"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
