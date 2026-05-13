@@ -17,11 +17,11 @@ export class PackageBuilder implements Bundler {
 
   public async bundle() {
     const metadata = new PackageMetadata(path.join(this.baseDir, "package.lua"));
-    await metadata.load();
-
+    let { version } = await metadata.load();
+    console.log(version)
     const files = metadata.getFiles();
 
-    const dist = path.join(distDir, "atomic", "packages", this.name);
+    const dist = path.join(distDir, "atomic", "packages", `${this.name}@${version}`);
 
     await fsp.mkdir(dist, { recursive: true });
 
@@ -38,6 +38,9 @@ export class PackageBuilder implements Bundler {
   }
 
   private async bundleFile(distDir: string, side: AddonSide, files: string[]) {
+    if (files.length === 0)
+      return;
+
     const outputFileName = `${side}.lua`;
     const outputFile = path.join(distDir, outputFileName);
     const stream = fs.createWriteStream(outputFile, { encoding: "utf8" });
@@ -51,6 +54,8 @@ export class PackageBuilder implements Bundler {
 
       core.info(`merged '${filePath}' into '${outputFileName}'`);
     }
+
+    core.info(`merging completed`);
 
     // minifiying result
     const minifier = new Minifier(outputFile);
@@ -69,21 +74,22 @@ export class PackageBuilder implements Bundler {
 class PackageMetadata {
   private path: string;
   private ast?: Chunk;
-  //@ts-ignore shut up
-  private metadataTree: Record<AddonSide, string[]> = {};
+  private dir?: string;
+  private metadataTree: Record<AddonSide, string[]> = { client: [], shared: [], server: [] };
 
   constructor(path: string) {
     this.path = path;
   }
 
-  public async load() {
+  public async load(): Promise<{ version: string }> {
     const content = await fsp.readFile(this.path, 'utf-8');
     this.ast = parse(content, { comments: false, locations: false, scope: true });
-    this.buildTree();
+    return this.buildTree();
   }
 
-  private buildTree() {
+  private buildTree(): { version: string } {
     const unquote = (str: string) => str.replace(/^"(.*)"$/, '$1');
+    let version: string = "release";
 
     const extractSection = (node: any) => {
       if (node.type !== 'TableConstructorExpression') return [];
@@ -98,23 +104,44 @@ class PackageMetadata {
 
     const traverse = (node: any) => {
       if (!node || node.type !== 'TableConstructorExpression') return;
+
+      let filesNode: any;
+
       for (const field of node.fields) {
-        if (field.type === 'TableKeyString' && field.key.name === 'files') {
-          const filesNode = field.value;
-          if (filesNode.type === 'TableConstructorExpression') {
-            for (const sectionField of filesNode.fields) {
-              if (sectionField.type === 'TableKeyString') {
-                const sectionName = field.key.name as AddonSide;
-                const name = sectionField.key.name as AddonSide;
-                if (['client', 'server', 'shared'].includes(name)) {
-                  this.metadataTree[name] = extractSection(sectionField.value);
-                }
-              }
+        if (field.type !== 'TableKeyString') continue;
+
+        if (field.key.name === 'files' && field.value.type === 'TableConstructorExpression')
+          filesNode = field.value;
+
+        if (version === "release" && field.key.name === "version" && field.value.type === 'StringLiteral')
+          version = field.value.raw.replace(/^"(.*)"$/, '$1');
+      }
+
+      if (!filesNode) return;
+
+      for (const sectionField of filesNode.fields) {
+        if (sectionField.type !== 'TableKeyString') continue;
+
+        const name = sectionField.key.name as AddonSide | "dir";
+
+        if (name === 'dir' && sectionField.value.type === 'StringLiteral') {
+          this.dir = sectionField.value.raw.replace(/^"(.*)"$/, '$1');
+          continue;
+        }
+
+        if (!['client', 'server', 'shared'].includes(name)) continue;
+
+        const arr: string[] = [];
+
+        if (sectionField.value.type === 'TableConstructorExpression') {
+          for (const v of sectionField.value.fields) {
+            if (v.type === 'TableValue' && v.value.type === 'StringLiteral') {
+              arr.push(v.value.raw.replace(/^"(.*)"$/, '$1'));
             }
           }
-        } else if (field.value.type === 'TableConstructorExpression') {
-          traverse(field.value);
         }
+
+        this.metadataTree[name as AddonSide] = arr;
       }
     };
 
@@ -125,10 +152,37 @@ class PackageMetadata {
         }
       }
     }
+
+    return { version }
   }
 
   public getFiles(): Record<AddonSide, string[]> {
-    return this.metadataTree;
+    const result: Record<AddonSide, string[]> = {
+      client: [],
+      server: [],
+      shared: []
+    };
+
+    const normalize = (file: string) => {
+      let f = file;
+
+      if (!f.endsWith('.lua')) {
+        f += '.lua';
+      }
+
+      if (this.dir) {
+        f = path.posix.join(this.dir, f);
+      }
+
+      return f;
+    };
+
+    for (const side of ['client', 'server', 'shared'] as AddonSide[]) {
+      const files = this.metadataTree[side] || [];
+      result[side] = files.map(normalize);
+    }
+
+    return result;
   }
 
   public setFiles(section: AddonSide, files: string[]) {

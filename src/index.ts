@@ -1,7 +1,11 @@
+// what a shit code
+
 import * as core from "@actions/core";
-import { AddonBundler, PackageBuilder, type Bundler } from "./bundlers";
+import * as github from "@actions/github";
+import { AddonBundler, Minifier, PackageBuilder, type Bundler } from "./bundlers";
 import path from "path";
 import fs from "fs";
+import fsp from 'fs/promises';
 
 export type ProjectType = "package" | "addon";
 export type AddonSide = "client" | "shared" | "server";
@@ -9,16 +13,29 @@ export type AddonSide = "client" | "shared" | "server";
 const cwd = process.cwd();
 const name = core.getInput("name");
 const type = core.getInput("type") as ProjectType;
-export const distDir = path.join(process.cwd(), "dist", name, "lua");
+export const distBaseDir = path.join(process.cwd(), "dist", name);
+export const distDir = path.join(distBaseDir, "lua");
 
 fs.mkdirSync(distDir, { recursive: true });
+
+const filesToCopy = ["LICENSE", "LICENSE.md", "README", "README.md"]
+
+export async function fileExists(path: string) {
+	try {
+		await fsp.stat(path)
+		return true
+	} catch {
+		return false
+	}
+}
 
 async function main() {
   let bundler: Bundler;
 
   switch (type) {
     case "addon":
-      bundler = new AddonBundler(cwd, name);
+      let version = github.context.ref.startsWith("/refs/tags/") ? github.context.ref.replace("/refs/tags/", "") : "release";
+      bundler = new AddonBundler(cwd, name, version);
       break;
     case "package":
       bundler = new PackageBuilder(cwd, name);
@@ -31,7 +48,15 @@ async function main() {
 
   const startTime = performance.now();
   await bundler.bundle();
-  core.info(`bundling took ${(performance.now() - startTime).toFixed(2)}ms`);
+
+  for (const file of filesToCopy) {
+		try {
+			await fsp.access(file)
+			await fsp.copyFile(file, path.join(distBaseDir, file))
+		} catch {}
+	}
+
+  core.info(`bundling took ${(performance.now() - startTime - Minifier.getTimeoutMs()).toFixed(2)}ms`);
 }
 
 main().catch(err => core.setFailed(err.message));

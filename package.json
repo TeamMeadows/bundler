@@ -2,7 +2,7 @@
   "name": "bundler",
   "author": "smokingplaya",
   "repository": "https://github.com/TeamMeadows/bundler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "scripts": {
     "build": "ncc build src/index.ts -o action-dist"
   },
@@ -11,14 +11,13 @@
     "@vercel/ncc": "^0.38.4"
   },
   "peerDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.1",
     "@types/luaparse": "^0.2.13",
-    "@types/node": "^24.10.1",
-    "iconv-lite": "^0.7.0",
+    "@types/node": "^24.12.4",
     "luamin": "^1.0.4",
     "luaparse": "^0.3.1"
   }

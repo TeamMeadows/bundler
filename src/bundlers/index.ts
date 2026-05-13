@@ -18,18 +18,16 @@ export interface Bundler {
 };
 
 export class Minifier {
+  private static asyncAwaitTime: number = 500;
   constructor(private path: string) { }
 
   public async minify() {
     core.info(`minifying file "${this.path}"`);
 
-    // we use iconv-lite because of nodejs IS =FUCKING SHIT=
-    const iconv = require("iconv-lite");
-    const buffer = await fsp.readFile(this.path);
-    // why would i fucking decode my file through some fucking library
-    // when i can just read file without FUCKING TROUBLES like in bunjs???? because node js is fucking old piece of shit
-    // creators of nodejs, this message for you: please Keep Yourself Safe
-    let content = iconv.decode(buffer, "utf8");
+    // that is required nahui
+    await new Promise((resolve) => setTimeout(resolve, Minifier.asyncAwaitTime));
+
+    let content = (await fsp.readFile(this.path, "utf-8"));
     content = Minifier.escapeOperators(content);
 
     let minified = (await minify(content)) || "";
@@ -52,6 +50,10 @@ export class Minifier {
 
     await fsp.writeFile(this.path, minified, "utf8");
     core.info(`minified code written back to "${this.path}"`);
+  }
+
+  public static getTimeoutMs(): number {
+    return this.asyncAwaitTime
   }
 
   private static escapeOperators(code: string): string {

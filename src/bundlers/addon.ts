@@ -13,10 +13,12 @@ const smallSideName: Record<Exclude<AddonSide, "shared">, string> = {
 export class AddonBundler implements Bundler {
   baseDir: string;
   name: string;
+  version: string;
 
-  constructor(baseDir: string, name: string) {
+  constructor(baseDir: string, name: string, version: string) {
     this.baseDir = path.join(baseDir, "lua", "autorun");
     this.name = name;
+    this.version = version;
   }
 
   public async bundle() {
