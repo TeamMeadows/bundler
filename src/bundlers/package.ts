@@ -1,3 +1,6 @@
+// what a mess
+// fuck
+
 import * as core from "@actions/core";
 import path from "path";
 import fs from 'fs';
@@ -17,19 +20,22 @@ export class PackageBuilder implements Bundler {
 
   public async bundle() {
     const metadata = new PackageMetadata(path.join(this.baseDir, "package.lua"));
-    let { version } = await metadata.load();
-    console.log(version)
+    let { version, dir } = await metadata.load();
+
     const files = metadata.getFiles();
+    let metadataDist = path.join(distDir, "atomic", "packages", `${this.name}@${version}`);
+    let filesDist = metadataDist;
 
-    const dist = path.join(distDir, "atomic", "packages", `${this.name}@${version}`);
+    if (dir)
+      filesDist = path.join(metadataDist, dir);
 
-    await fsp.mkdir(dist, { recursive: true });
+    await fsp.mkdir(filesDist, { recursive: true });
 
-    await this.handleFile(dist, "client", files.client);
-    await this.handleFile(dist, "shared", files.shared);
-    await this.handleFile(dist, "server", files.server);
+    await this.handleFile(filesDist, "client", files.client);
+    await this.handleFile(filesDist, "shared", files.shared);
+    await this.handleFile(filesDist, "server", files.server);
 
-    await this.saveMetadata(metadata, dist, files);
+    await this.saveMetadata(metadata, metadataDist, files);
   }
 
   private async handleFile(distDir: string, side: AddonSide, files?: string[]) {
@@ -81,26 +87,14 @@ class PackageMetadata {
     this.path = path;
   }
 
-  public async load(): Promise<{ version: string }> {
+  public async load(): Promise<{ version: string, dir?: string }> {
     const content = await fsp.readFile(this.path, 'utf-8');
     this.ast = parse(content, { comments: false, locations: false, scope: true });
     return this.buildTree();
   }
 
-  private buildTree(): { version: string } {
-    const unquote = (str: string) => str.replace(/^"(.*)"$/, '$1');
+  private buildTree(): { version: string, dir?: string } {
     let version: string = "release";
-
-    const extractSection = (node: any) => {
-      if (node.type !== 'TableConstructorExpression') return [];
-      const arr: string[] = [];
-      for (const v of node.fields) {
-        if (v.type === 'TableValue' && v.value.type === 'StringLiteral') {
-          arr.push(unquote(v.value.raw));
-        }
-      }
-      return arr;
-    };
 
     const traverse = (node: any) => {
       if (!node || node.type !== 'TableConstructorExpression') return;
@@ -153,7 +147,7 @@ class PackageMetadata {
       }
     }
 
-    return { version }
+    return { version, dir: this.dir }
   }
 
   public getFiles(): Record<AddonSide, string[]> {
@@ -191,15 +185,74 @@ class PackageMetadata {
 
   public async saveToFile(outputFile: string) {
     const content = await fsp.readFile(this.path, 'utf-8');
+    const ast = parse(content, { comments: true, scope: true, locations: false });
 
-    let newContent = content.replace(
-      /(\b(client|server|shared)\s*=\s*\{)([\s\S]*?)(\})/g,
-      (_, start, section) => {
-        const arr = this.metadataTree[section as AddonSide] || [];
-        return `${start} ${arr.map(s => `"${s}"`).join(', ')} }`;
+    const updateFilesTable = (node: any) => {
+      if (!node || node.type !== 'TableConstructorExpression') return;
+
+      for (const field of node.fields) {
+        if (field.type !== 'TableKeyString') continue;
+
+        if (field.key.name !== 'files') continue;
+        if (field.value.type !== 'TableConstructorExpression') continue;
+
+        for (const section of field.value.fields) {
+          if (section.type !== 'TableKeyString') continue;
+
+          const name = section.key.name as AddonSide;
+          if (!['client', 'server', 'shared'].includes(name)) continue;
+
+          const arr = this.metadataTree[name] || [];
+
+          section.value = {
+            type: 'TableConstructorExpression',
+            fields: arr.map(v => ({
+              type: 'TableValue',
+              value: {
+                type: 'StringLiteral',
+                raw: `"${v}"`
+              }
+            }))
+          };
+        }
       }
-    );
+    };
 
-    await fsp.writeFile(outputFile, newContent, 'utf-8');
+    for (const node of ast.body) {
+      if (node.type === 'ReturnStatement') {
+        for (const arg of node.arguments) {
+          updateFilesTable(arg);
+        }
+      }
+    }
+
+    const generate = (node: any): string => {
+      switch (node.type) {
+        case 'Chunk':
+          return node.body.map(generate).join('\n');
+
+        case 'ReturnStatement':
+          return `return ${node.arguments.map(generate).join(', ')}`;
+
+        case 'TableConstructorExpression':
+          return `{ ${node.fields.map(generate).join(', ')} }`;
+
+        case 'TableKeyString':
+          return `${node.key.name} = ${generate(node.value)}`;
+
+        case 'TableValue':
+          return generate(node.value);
+
+        case 'StringLiteral':
+          return node.raw;
+
+        default:
+          return '';
+      }
+    };
+
+    const result = generate(ast);
+
+    await fsp.writeFile(outputFile, result, 'utf-8');
   }
 }
