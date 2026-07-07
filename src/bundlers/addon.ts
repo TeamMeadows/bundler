@@ -3,7 +3,7 @@ import * as fsSync from "fs";
 import * as fs from "fs/promises";
 import path from "path";
 import { BlockWriter, Minifier, type Bundler } from ".";
-import { distDir, type AddonSide } from "..";
+import { distDir, baseDir, type AddonSide } from "..";
 
 const smallSideName: Record<Exclude<AddonSide, "shared">, string> = {
   "client": "cl",
@@ -15,8 +15,9 @@ export class AddonBundler implements Bundler {
   name: string;
   version: string;
 
-  constructor(baseDir: string, name: string, version: string) {
-    this.baseDir = path.join(baseDir, "lua", "autorun");
+  constructor(root: string, name: string, version: string) {
+    this.baseDir = path.join(root, ...baseDir);
+    console.log(this.baseDir)
     this.name = name;
     this.version = version;
   }
@@ -47,7 +48,7 @@ export class AddonBundler implements Bundler {
     if (files.length === 0)
       return;
 
-    const dist = path.join(distDir, "autorun");
+    const dist = path.join(distDir);
     await fs.mkdir(dist, { recursive: true });
 
     const outputFileName = side == "shared" ? `autorun_${this.name}.lua` : `${side}/autorun_${smallSideName[side]}_${this.name}.lua`;

@@ -14,7 +14,9 @@ const cwd = process.cwd();
 const name = core.getInput("name");
 const type = core.getInput("type") as ProjectType;
 export const distBaseDir = path.join(process.cwd(), "dist", name);
-export const distDir = path.join(distBaseDir, "lua");
+const inputBaseDir = core.getMultilineInput("basedir");
+export const baseDir = inputBaseDir.length == 0 ? ["lua", "autorun"] : inputBaseDir;
+export const distDir = path.join(distBaseDir, ...baseDir);
 
 fs.mkdirSync(distDir, { recursive: true });
 
@@ -34,8 +36,9 @@ async function main() {
 
   switch (type) {
     case "addon":
-      let version = github.context.ref.startsWith("/refs/tags/") ? github.context.ref.replace("/refs/tags/", "") : "release";
-      bundler = new AddonBundler(cwd, name, version);
+      // let version = github.context.ref.startsWith("/refs/tags/") ? github.context.ref.replace("/refs/tags/", "") : "release";
+      // bundler = new AddonBundler(cwd, name, version); -- todo uncomment
+      bundler = new AddonBundler(cwd, name, "1.0.0-rc.4+build-menu");
       break;
     case "package":
       bundler = new PackageBuilder(cwd, name);

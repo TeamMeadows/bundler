@@ -13,9 +13,11 @@ inputs:
     required: false
     default: false
   name:
-    description:
+    description: Name of the addon
     required: true
-
+  basedir:
+    description: Directory where bundler will be lookup for autorun file
+    required: true
 runs:
   using: node20
   main: action-dist/index.js

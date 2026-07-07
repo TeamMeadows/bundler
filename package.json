@@ -2,7 +2,7 @@
   "name": "bundler",
   "author": "smokingplaya",
   "repository": "https://github.com/TeamMeadows/bundler",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "scripts": {
     "build": "ncc build src/index.ts -o action-dist"
   },
